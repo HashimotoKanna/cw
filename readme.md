@@ -2,9 +2,19 @@
 
 just for fun
 
+파이썬 공부를 시작했을 때 공부도 할 겸 재미도 볼 겸 만들어본 웹툰/유튜브 크롤러입니다. 
+
 ## requirements
 
-`pip install requests bs4`
+`requests`
+
+`bs4`
+
+다음 명령어로 파이썬 패키지를 설치하세요. 
+
+- Linux or Mac : `pip install requests bs4`
+
+- Windows : `python -m pip install requests bs4`
 
 ## Usage 
 
