@@ -206,10 +206,3 @@ class NaverCrawl(CrawlBase):
         
         html = join(head, title, body, *img_tags, tail)
         savefile(filename, html, utf8=True)
-
-if __name__ == '__main__':
-    target = (
-        'http://comic.naver.com/webtoon/detail.nhn?titleId=697679&no=144&weekday=fri',
-        '쌉니다 천리마마트'
-    )
-    NaverCrawl(*target).doit()
