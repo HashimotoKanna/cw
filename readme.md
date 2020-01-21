@@ -35,10 +35,10 @@ nc.doit()
 
 `python main.py`
 
-![cw](cw.gif)
+![cw](https://user-images.githubusercontent.com/16812446/72775222-dfeb2000-3c50-11ea-83ea-657bf210e3be.gif)
 
 ## View 
 
 크롤링 된 이미지를 `.html` 파일로 재조립합니다. `html` 파일을 브라우저로 열어서 만화를 볼 수 있습니다. 
 
-![html](html.PNG)
+![html](https://user-images.githubusercontent.com/16812446/72775233-e7aac480-3c50-11ea-8ab1-e5da0e1064d1.PNG)
