@@ -1,4 +1,6 @@
-import os, re, sys 
+import os
+import re
+import sys
 import codecs
 from multiprocessing import cpu_count, Pool
 from bs4 import BeautifulSoup
@@ -7,11 +9,12 @@ from urllib.parse import urlencode
 
 whitespace_pattern = re.compile(r'\s+')
 
+
 def urlencode_noquote(query): return urlencode(
     query, quote_via=lambda k, l, m, n: k)
 
 
-def savefile(filepath, content, utf8=False):
+def savefile(filepath, content):
     dir_path = os.path.dirname(filepath)
     if not os.path.exists(dir_path):
         os.makedirs(dir_path)
@@ -19,93 +22,51 @@ def savefile(filepath, content, utf8=False):
         f.write(content)
 
 
-class InvalidURL(requests.exceptions.MissingSchema):
-    pass
-
-
-class EmptyContent(Exception):
-    pass
-
-
-def error_print(type, url_target):
-    sys.stderr.write('%s IS EMPTY\n' % type)
-    sys.stderr.write('URL TARGET : '+url_target['href'])
-    sys.stderr.write('URL NAME : '+url_target.text)
-
-
 class MarumaruCrawl:
-    ROOT = 'http://wasabisyrup.com'
+    ROOT = 'https://marumaru.town'
+    INDEX_PAGE = ROOT + '/bbs/cmoic/'
 
-    ATTEMPT_IF_FAILED = 5
-    JPEG_MAGIC_NUMBER = b'\xff\xd8\xff\xe0'
+    def __init__(self, comicId, name):
+        self.name = name
+        self.dir_path = os.path.join(os.path.dirname(__file__), self.name)
+        self.comicId = comicId
+        resp = requests.get(self.INDEX_PAGE + repr(self.comicId))
+        soup = BeautifulSoup(resp.text, 'html.parser')
+        self.comic_pages = {}
+        for i, page in enumerate(soup.select('td.list-subject a')):
+            sub_title = re.sub(whitespace_pattern, '', page.text)
+            no = int(page['href'].split('/')[-1])
+            self.comic_pages[no] = {
+                'page': page['href'],
+                'sub_title': sub_title
+            }
 
-    def __init__(self, target, name):
-        text = requests.get(target)
-        soup = BeautifulSoup(text, 'html.parser')
-        self.index = soup.select('#vContent a')
-        self.failed = {'msg': str(), 'lst': list()}
+    def crawl(self, start=float('-inf'), end=float('inf')):
+        args = []
+        for no, item in self.comic_pages.items():
+            if no < start:
+                break
+            if no > end:
+                continue
+            args.append((
+                self.comic_pages[no]['page'],
+                self.comic_pages[no]['sub_title']))
 
-    def doit(self):
-        for i, idx in enumerate(self.index):
-            self.crawl(idx)
-        with open('fail_log.txt', 'w') as f:
-            fail = self.failed['msg']
-            fail += '\n\n'
-            for src in self.failed['lst']:
-                fail += src + '\n'
-            f.write(fail)
+        with Pool(processes=cpu_count()) as pool:
+            pool.map(self._crawl_from_map, args)
 
-    def crawl(self, url_target):
-        try:
-            text = requests.get(url_target['href'])
-            soup = BeautifulSoup(text, 'html.parser')
-            titles = soup.select('.title-text span')
-            imgs = soup.select('.article-gallery img')
+    def _crawl_from_map(self, args):
+        self._crawl(*args)
 
-            if not titles:
-                error_print('TITLES', url_target)
-                raise EmptyContent
-            if not imgs:
-                error_print('IMAGE TAGS', url_target)
-                raise EmptyContent
-        except InvalidURL:
-            return
-        except EmptyContent:
-            return
-        else:
-
-            title = titles[0].text
-            subtitle = titles[1].text
-            dir = makedir(title, subtitle)
-
-            for i, img in enumerate(imgs):
-                if i < 10:
-                    filename = os.path.join(dir, '00'+repr(i)+'.jpeg')
-                elif 10 <= i < 100:
-                    filename = os.path.join(dir, '0'+repr(i)+'.jpeg')
-                else:
-                    filename = os.path.join(dir, repr(i)+'.jpeg')
-
-                for _ in range(self.ATTEMPT_IF_FAILED):
-                    src = self.ROOT + img['data-src']
-                    jpeg = requests.get(src).content
-                    if jpeg[:4] == self.JPEG_MAGIC_NUMBER:
-                        break
-                    print(title, subtitle, i, '번째 이미지 크롤 실패 재시도...')
-                else:
-                    print(title, subtitle, i, '번째 이미지 크롤 실패...')
-                    self.failed['msg'] += ' '.join((title,
-                                                    subtitle, repr(i), '번쨰 이미지\n'))
-                    self.failed['lst'].append(src)
-                    continue
-                savefile(filename, jpeg)
-
-                percentage = round(i / len(imgs) * 100)
-                msg = ' '.join((
-                    title, subtitle, '크롤링 중..', repr(percentage), '%', '\r'
-                ))
-                print(msg)
-            print('')
+    def _crawl(self, page, sub_title):
+        resp = requests.get(self.ROOT + page)
+        soup = BeautifulSoup(resp.text, 'html.parser')
+        for i, img in enumerate(soup.select('div.view-img img')):
+            img_data = requests.get(self.ROOT+img['src']).content
+            subdir_path = os.path.join(self.dir_path, sub_title.zfill(3))
+            img_filepath = os.path.join(subdir_path, repr(i).zfill(3)+'.jpg')
+            savefile(img_filepath, img_data)
+        print((self.name, sub_title, 'crawling complete')
 
 
 class NaverCrawl:
@@ -141,21 +102,25 @@ class NaverCrawl:
 
     def __init__(self, titleId):
         params = {
-            'titleId' : titleId
+            'titleId': titleId
         }
-        resp = requests.get(self.NAVER_WEBTOON_LIST + urlencode_noquote(params))
+        resp = requests.get(self.NAVER_WEBTOON_LIST +
+                            urlencode_noquote(params))
         soup = BeautifulSoup(resp.text, 'html.parser')
-        self.name = re.sub(whitespace_pattern, '', soup.select('div.detail h2')[0].text)
+        self.name = re.sub(whitespace_pattern, '',
+                           soup.select('div.detail h2')[0].text)
         self.titleId = titleId
-        self.latest = int(re.search(self.no_pattern, soup.select('td.title a')[0]['href']).group(0)[3:])
+        self.latest = int(re.search(self.no_pattern, soup.select(
+            'td.title a')[0]['href']).group(0)[3:])
 
     def crawl(self, start=1, end=None):
-        if end is None: end = self.latest
+        if end is None:
+            end = self.latest
 
         args = []
         dir_path = os.path.join(os.path.dirname(__file__), self.name)
         for no in range(start, end + 1):
-            page_title = str(no) + '화'
+            page_title = str(no)
             subdir_path = os.path.join(dir_path, page_title)
             html_file_path = os.path.join(subdir_path, page_title+'.html')
             if os.path.exists(html_file_path):
@@ -191,7 +156,7 @@ class NaverCrawl:
 
         img_filepath_list = []
         for i, img_tag in enumerate(img_tags):
-            img_filepath = os.path.join(subdir_path, repr(i)+'.jpg')
+            img_filepath = os.path.join(subdir_path, repr(i).zfill(3)+'.jpg')
             img_filepath_list.append(img_filepath)
             if os.path.exists(img_filepath):
                 continue
@@ -201,13 +166,13 @@ class NaverCrawl:
 
         self._webtoon_page_html(
             page_title, html_file_path, img_filepath_list)
-        print(' '.join((self.name, page_title, 'crawling complete')))
+        print(self.name, page_title, 'crawling complete')
 
     def main_page(self, start, end, dir_path):
         def atags(
             title): return '<a href="{name}/{name}.html">{name}</a><br>'.format(name=title)
 
-        atags = ''.join(atags(repr(i)+'화')
+        atags = ''.join(atags(repr(i))
                         for i in range(start, end + 1))
         html = self.WEBTOON_PAGE_HTML_HEAD + self.name + self.WEBTOON_MAIN_HTML_BODY + \
             self.name + '</h1>' + atags + self.WEBTOON_PAGE_HTML_TAIL
