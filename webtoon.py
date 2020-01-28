@@ -66,7 +66,7 @@ class MarumaruCrawl:
             subdir_path = os.path.join(self.dir_path, sub_title.zfill(3))
             img_filepath = os.path.join(subdir_path, repr(i).zfill(3)+'.jpg')
             savefile(img_filepath, img_data)
-        print((self.name, sub_title, 'crawling complete')
+        print(self.name, sub_title, 'crawling complete')
 
 
 class NaverCrawl:
