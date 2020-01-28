@@ -18,17 +18,21 @@ just for fun
 
 ## Usage 
 
-원하는 웹툰을 크롤링 할 수 있도록 `main.py` 를 적절히 수정하세요. **신의탑** 을 크롤링 하고 싶다면 "**신의탑의 최신화 링크**"와 "**신의탑**"을 인자로 전달해야 합니다. 
+원하는 웹툰을 크롤링 할 수 있도록 `main.py` 를 적절히 수정하세요.
 
 ```python
 from webtoon import *
 
-target = (
-    'https://comic.naver.com/webtoon/detail.nhn?titleId=183559&no=461&weekday=mon',
-    '신의탑'
-)
-nc = NaverCrawl(*target)
-nc.doit()
+def test_GOD_TOP():
+    nc = NaverCrawl(183559) # 신의탑
+    nc.crawl(442)
+
+def test_OnePiece():
+    mc = MarumaruCrawl(19967, 'onepiece') # 원피스 
+    mc.crawl(131949)
+
+if __name__ == '__main__':
+    test_OnePiece()
 ```
 
 그리고 `main.py` 를 실행하세요. 
